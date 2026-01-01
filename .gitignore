@@ -1,8 +1,9 @@
+docling-models-exports/
 model_artifacts/
 scratch/
 .md-lint
 actionlint
-
+docling-models-exports.zip
 # Created by https://www.toptal.com/developers/gitignore/api/python,macos,virtualenv,pycharm,visualstudiocode,emacs,vim,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,macos,virtualenv,pycharm,visualstudiocode,emacs,vim,jupyternotebooks
 

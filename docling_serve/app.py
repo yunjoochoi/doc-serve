@@ -7,7 +7,12 @@ import time
 from contextlib import asynccontextmanager
 from io import BytesIO
 from typing import Annotated
+from docling_serve.settings import docling_serve_settings
+from docling.datamodel.settings import settings as core_settings
+core_settings.perf.doc_batch_size = 4       # 배치 사이즈 4 고정
+core_settings.perf.doc_batch_concurrency = 1 # 동시성 1로 고정
 
+print(f"[SYSTEM HACK] Forced doc_batch_size to {core_settings.perf.doc_batch_size}")
 from fastapi import (
     BackgroundTasks,
     Depends,

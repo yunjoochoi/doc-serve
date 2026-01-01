@@ -39,9 +39,10 @@ WORKDIR /opt/app-root/src
 
 ENV \
     OMP_NUM_THREADS=4 \
-    LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     PYTHONIOENCODING=utf-8 \
+    PYTHONUTF8=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/app-root \
@@ -60,12 +61,12 @@ RUN --mount=from=uv_stage,source=/uv,target=/bin/uv \
 
 ARG MODELS_LIST="layout tableformer picture_classifier rapidocr easyocr"
 
-RUN echo "Downloading models..." && \
-    HF_HUB_DOWNLOAD_TIMEOUT="90" \
-    HF_HUB_ETAG_TIMEOUT="90" \
-    docling-tools models download -o "${DOCLING_SERVE_ARTIFACTS_PATH}" ${MODELS_LIST} && \
-    chown -R 1001:0 ${DOCLING_SERVE_ARTIFACTS_PATH} && \
-    chmod -R g=u ${DOCLING_SERVE_ARTIFACTS_PATH}
+# RUN echo "Downloading models..." && \
+#     HF_HUB_DOWNLOAD_TIMEOUT="90" \
+#     HF_HUB_ETAG_TIMEOUT="90" \
+#     docling-tools models download -o "${DOCLING_SERVE_ARTIFACTS_PATH}" ${MODELS_LIST} && \
+#     chown -R 1001:0 ${DOCLING_SERVE_ARTIFACTS_PATH} && \
+#     chmod -R g=u ${DOCLING_SERVE_ARTIFACTS_PATH}
 
 COPY --chown=1001:0 ./docling_serve ./docling_serve
 
