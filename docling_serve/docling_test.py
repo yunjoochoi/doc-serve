@@ -60,7 +60,7 @@ class ParserConfig(BaseModel):
     table_batch_size: int = 32
 
     # Batch processing settings
-    doc_batch_size: int = 16  # Number of documents processed at once
+    doc_batch_size: int = 4  # Number of documents processed at once
     doc_batch_concurrency: int = 1  # Number of concurrent workers
 
 class DoclingParser:
@@ -118,7 +118,13 @@ class DoclingParser:
         Returns:
             Configured PdfPipelineOptions instance with OCR, table detection, and batch settings
         """
-        options = PdfPipelineOptions()
+        # Get artifacts path from environment or use default
+        import os
+        artifacts_path = os.getenv('DOCLING_SERVE_ARTIFACTS_PATH')
+        if artifacts_path:
+            artifacts_path = Path(artifacts_path)
+
+        options = PdfPipelineOptions(artifacts_path=artifacts_path)
 
         options.do_ocr = config.do_ocr
         options.do_table_structure = config.do_table_structure
@@ -867,15 +873,15 @@ class DocTool:
     with automatic image extraction.
     """
 
-    def __init__(self):
+    def __init__(self, config: Optional[ParserConfig] = None):
         """
         Initialize the document processing tool.
 
         Args:
-            do_ocr: Whether to perform OCR on images within documents
-            do_table_structure: Whether to detect and preserve table structures
+            config: Parser configuration. If None, uses default ParserConfig
         """
-        config = ParserConfig()
+        if config is None:
+            config = ParserConfig()
 
         self._parser = DoclingParser(config=config)
 

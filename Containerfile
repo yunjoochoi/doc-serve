@@ -33,6 +33,14 @@ FROM ${UV_IMAGE} AS uv_stage
 
 FROM docling-base
 
+# Create cache directories with proper permissions before switching to user 1001
+USER 0
+RUN mkdir -p /opt/app-root/src/.cache/huggingface/hub && \
+    mkdir -p /opt/app-root/src/.cache/huggingface/modules && \
+    mkdir -p /opt/app-root/src/.cache/docling/models && \
+    chown -R 1001:0 /opt/app-root/src/.cache && \
+    chmod -R g=u /opt/app-root/src/.cache
+
 USER 1001
 
 WORKDIR /opt/app-root/src
@@ -46,7 +54,8 @@ ENV \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/opt/app-root \
-    DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models
+    DOCLING_SERVE_ARTIFACTS_PATH=/opt/app-root/src/.cache/docling/models \
+    HF_HOME=/opt/app-root/src/.cache/huggingface
 
 ARG UV_SYNC_EXTRA_ARGS
 

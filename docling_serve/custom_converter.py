@@ -13,6 +13,7 @@ from docling.datamodel.base_models import DocumentStream
 from docling.datamodel.document import ConversionResult
 from docling_jobkit.convert.manager import DoclingConverterManagerConfig
 from docling_jobkit.datamodel.convert import ConvertDocumentsOptions
+from docling_serve.docling_test import DocTool
 
 _log = logging.getLogger(__name__)
 
@@ -27,14 +28,45 @@ class CustomConverterManager:
         self.config = config
         _log.info("[CustomConverter] Initializing custom converter manager")
 
-        # Import DocTool here to avoid circular imports
-        # We'll import it from the docling_test module
-        from docling_test import DocTool
-        self.doc_tool = DocTool()
+        # Import ParserConfig and configure with settings from config
+        from docling_serve.docling_test import ParserConfig
+
+        parser_config = ParserConfig(
+            layout_batch_size=config.layout_batch_size or 32,
+            table_batch_size=config.table_batch_size or 32,
+        )
+
+        self.doc_tool = DocTool(config=parser_config)
+        _log.info(f"[CustomConverter] Configured with layout_batch_size={parser_config.layout_batch_size}, table_batch_size={parser_config.table_batch_size}")
 
     def clear_cache(self):
         """Clear any cached converters (no-op for custom implementation)."""
         _log.debug("[CustomConverter] Cache clear requested (no-op)")
+
+    def get_pdf_pipeline_opts(self, request: ConvertDocumentsOptions):
+        """
+        Return dummy pipeline options for compatibility.
+        This is called by LocalOrchestrator.warm_up_caches() but not used in custom converter.
+        """
+        from docling.document_converter import PdfFormatOption
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+
+        _log.debug("[CustomConverter] get_pdf_pipeline_opts called (returning dummy options)")
+        return PdfFormatOption(
+            pipeline_options=PdfPipelineOptions(),
+            backend=PyPdfiumDocumentBackend
+        )
+
+    def get_converter(self, pdf_format_option):
+        """
+        Return dummy converter for compatibility.
+        This is called by LocalOrchestrator.warm_up_caches() but not used in custom converter.
+        """
+        from docling.document_converter import DocumentConverter
+
+        _log.debug("[CustomConverter] get_converter called (returning dummy converter)")
+        return DocumentConverter()
 
     def convert_documents(
         self,
@@ -100,6 +132,13 @@ class CustomConverterManager:
         # This is a simplified conversion - extend as needed
         text_item = TextItem(text=custom_doc.text)
         docling_doc.add_text(text_item)
+        
+        # CRITICAL: Override export_to_markdown to return our custom markdown
+        custom_markdown_text = custom_doc.text
+        def custom_export_to_markdown(*args, **kwargs):
+            return custom_markdown_text
+
+        docling_doc.export_to_markdown = custom_export_to_markdown
 
         # Store custom images in the document's metadata if needed
         # The images are already base64-encoded in custom_doc.images
