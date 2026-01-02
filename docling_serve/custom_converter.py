@@ -132,14 +132,16 @@ class CustomConverterManager:
             result = self._create_conversion_result(custom_doc, options)
             yield result
 
-    def _create_conversion_result(self, custom_doc, options: ConvertDocumentsOptions) -> ConversionResult:
+    def _create_conversion_result(self, custom_doc, options: ConvertDocumentsOptions):
         """
         Convert custom Document object to docling's ConversionResult format.
 
         This creates a compatibility layer between the custom parser output
         and what docling_serve expects.
         """
-        from docling.datamodel.document import ConversionResult, ConversionStatus
+        from docling.datamodel.document import ConversionResult, ConversionStatus, InputDocument
+        from docling.datamodel.base_models import InputFormat
+        from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
         from docling_core.types.doc import DoclingDocument
 
         # Create a wrapper class that overrides export_to_markdown
@@ -153,14 +155,18 @@ class CustomConverterManager:
         docling_doc = CustomDoclingDocument(name=custom_doc.id)
         docling_doc._custom_markdown = custom_doc.text
 
-        # Create a mock input object (avoid actually opening PDF)
-        class MockInputDocument:
-            def __init__(self, filename):
-                self.file = type('obj', (object,), {'name': filename})()
-                self.filename = filename
-                self.valid = True
-
-        input_doc = MockInputDocument(custom_doc.id)
+        # Create a mock InputDocument using model_construct to bypass Pydantic validation
+        # This avoids actually opening the PDF file
+        input_doc = InputDocument.model_construct(
+            path_or_stream=BytesIO(b"%PDF-1.4"),  # Minimal valid PDF header
+            format=InputFormat.PDF,
+            backend=PyPdfiumDocumentBackend,
+            filename=custom_doc.id,
+            valid=True,
+            limits=None,
+        )
+        # Manually set the file attribute for compatibility
+        input_doc.file = type('obj', (object,), {'name': custom_doc.id})()
 
         # Create conversion result
         result = ConversionResult(
