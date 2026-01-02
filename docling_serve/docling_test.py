@@ -12,6 +12,7 @@ from docling_core.types.io import DocumentStream
 from docling.datamodel.settings import settings
 from docling_core.types.doc.document import PictureItem
 from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
+from docling.backend.docling_parse_v4_backend import DoclingParseV4DocumentBackend
 
 from pydantic import BaseModel, Field
 
@@ -55,9 +56,9 @@ class ParserConfig(BaseModel):
     images_scale: float = 2.0  # Scale factor for generated images
 
     # Maximum number of pages the RT-DETR model processes in parallel in a single inference pass
-    layout_batch_size: int = 32
+    layout_batch_size: int = 64
     # Maximum number of table images that the TableFormer model
-    table_batch_size: int = 32
+    table_batch_size: int = 64
 
     # Batch processing settings
     doc_batch_size: int = 4  # Number of documents processed at once
@@ -87,12 +88,12 @@ class DoclingParser:
         settings.perf.doc_batch_concurrency = self.config.doc_batch_concurrency
         pipeline_options = self._create_pipeline_options(self.config)
 
-        # Primary converter with default backend
+        # Primary converter with DoclingParseV4DocumentBackend (faster, but may fail on some PDFs)
         self.converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
                     pipeline_options=pipeline_options,
-                    backend=PyPdfiumDocumentBackend # 둘다 수정
+                    backend=DoclingParseV4DocumentBackend
                 )
             }
         )

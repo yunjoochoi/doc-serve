@@ -31,13 +31,27 @@ class CustomConverterManager:
         # Import ParserConfig and configure with settings from config
         from docling_serve.docling_test import ParserConfig
 
-        parser_config = ParserConfig(
-            layout_batch_size=config.layout_batch_size or 32,
-            table_batch_size=config.table_batch_size or 32,
-        )
+        # Use ParserConfig defaults, override only if explicitly set in config
+        parser_kwargs = {}
+        if config.layout_batch_size is not None:
+            parser_kwargs['layout_batch_size'] = config.layout_batch_size
+        if config.table_batch_size is not None:
+            parser_kwargs['table_batch_size'] = config.table_batch_size
+
+        parser_config = ParserConfig(**parser_kwargs)
 
         self.doc_tool = DocTool(config=parser_config)
-        _log.info(f"[CustomConverter] Configured with layout_batch_size={parser_config.layout_batch_size}, table_batch_size={parser_config.table_batch_size}")
+        _log.info(
+            f"[CustomConverter] Configured with: "
+            f"do_ocr={parser_config.do_ocr}, "
+            f"do_table_structure={parser_config.do_table_structure}, "
+            f"generate_picture_images={parser_config.generate_picture_images}, "
+            f"images_scale={parser_config.images_scale}, "
+            f"layout_batch_size={parser_config.layout_batch_size}, "
+            f"table_batch_size={parser_config.table_batch_size}, "
+            f"doc_batch_size={parser_config.doc_batch_size}, "
+            f"doc_batch_concurrency={parser_config.doc_batch_concurrency}"
+        )
 
     def clear_cache(self):
         """Clear any cached converters (no-op for custom implementation)."""
@@ -45,28 +59,31 @@ class CustomConverterManager:
 
     def get_pdf_pipeline_opts(self, request: ConvertDocumentsOptions):
         """
-        Return dummy pipeline options for compatibility.
-        This is called by LocalOrchestrator.warm_up_caches() but not used in custom converter.
+        Return pipeline options with artifacts_path for compatibility.
+        This is called by LocalOrchestrator.warm_up_caches().
         """
         from docling.document_converter import PdfFormatOption
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 
-        _log.debug("[CustomConverter] get_pdf_pipeline_opts called (returning dummy options)")
+        _log.debug(f"[CustomConverter] get_pdf_pipeline_opts called (artifacts_path={self.config.artifacts_path})")
         return PdfFormatOption(
-            pipeline_options=PdfPipelineOptions(),
+            pipeline_options=PdfPipelineOptions(artifacts_path=self.config.artifacts_path),
             backend=PyPdfiumDocumentBackend
         )
 
     def get_converter(self, pdf_format_option):
         """
-        Return dummy converter for compatibility.
-        This is called by LocalOrchestrator.warm_up_caches() but not used in custom converter.
+        Return converter with proper artifacts_path for compatibility.
+        This is called by LocalOrchestrator.warm_up_caches().
         """
         from docling.document_converter import DocumentConverter
+        from docling.datamodel.base_models import InputFormat
 
-        _log.debug("[CustomConverter] get_converter called (returning dummy converter)")
-        return DocumentConverter()
+        _log.debug(f"[CustomConverter] get_converter called (using pdf_format_option with artifacts_path)")
+        return DocumentConverter(
+            format_options={InputFormat.PDF: pdf_format_option}
+        )
 
     def convert_documents(
         self,
@@ -122,32 +139,28 @@ class CustomConverterManager:
         This creates a compatibility layer between the custom parser output
         and what docling_serve expects.
         """
-        from docling.datamodel.document import ConversionResult, ConversionStatus, InputDocument
-        from docling_core.types.doc import DoclingDocument, TextItem
+        from docling.datamodel.document import ConversionResult, ConversionStatus
+        from docling_core.types.doc import DoclingDocument
 
-        # Create a minimal DoclingDocument from custom output
-        docling_doc = DoclingDocument(name=custom_doc.id)
+        # Create a wrapper class that overrides export_to_markdown
+        class CustomDoclingDocument(DoclingDocument):
+            _custom_markdown: str = ""
 
-        # Add the markdown text as a text item
-        # This is a simplified conversion - extend as needed
-        text_item = TextItem(text=custom_doc.text)
-        docling_doc.add_text(text_item)
-        
-        # CRITICAL: Override export_to_markdown to return our custom markdown
-        custom_markdown_text = custom_doc.text
-        def custom_export_to_markdown(*args, **kwargs):
-            return custom_markdown_text
+            def export_to_markdown(self, *args, **kwargs) -> str:
+                return self._custom_markdown
 
-        docling_doc.export_to_markdown = custom_export_to_markdown
+        # Create document with custom markdown
+        docling_doc = CustomDoclingDocument(name=custom_doc.id)
+        docling_doc._custom_markdown = custom_doc.text
 
-        # Store custom images in the document's metadata if needed
-        # The images are already base64-encoded in custom_doc.images
+        # Create a mock input object (avoid actually opening PDF)
+        class MockInputDocument:
+            def __init__(self, filename):
+                self.file = type('obj', (object,), {'name': filename})()
+                self.filename = filename
+                self.valid = True
 
-        # Create input document info
-        input_doc = InputDocument(
-            file=DocumentStream(name=custom_doc.id, stream=BytesIO(b"")),
-            format=None,
-        )
+        input_doc = MockInputDocument(custom_doc.id)
 
         # Create conversion result
         result = ConversionResult(

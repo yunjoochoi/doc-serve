@@ -18,7 +18,7 @@ class UvicornSettings(BaseSettings):
     reload: bool = False
     root_path: str = ""
     proxy_headers: bool = True
-    timeout_keep_alive: int = 60
+    timeout_keep_alive: int = 1000
     ssl_certfile: Optional[Path] = None
     ssl_keyfile: Optional[Path] = None
     ssl_keyfile_password: Optional[str] = None
@@ -66,7 +66,7 @@ class DoclingServeSettings(BaseSettings):
     batch_polling_interval_seconds: Optional[float] = None
 
     sync_poll_interval: int = 2  # seconds
-    max_sync_wait: int = 120  # 2 minutes
+    max_sync_wait: int = 1000  # ~16 minutes
 
     cors_origins: list[str] = ["*"]
     cors_methods: list[str] = ["*"]
